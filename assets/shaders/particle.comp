@@ -1,0 +1,168 @@
+#version 430
+layout(local_size_x = 256) in;
+
+struct Particle {
+    vec4 pos;   // position (x, y, z, w)
+    vec4 vel;   // velocity (x, y, z, w)
+    vec4 col;   // color (r, g, b, a)
+    vec4 group; // group info (group_index, unused, unused, unused)
+};
+
+layout(std430, binding = 0) buffer Particles {
+    Particle particles[];
+};
+
+// Spatial grid for optimization
+// Each cell stores particle indices
+layout(std430, binding = 1) buffer GridBuffer {
+    int grid_data[];
+};
+
+// Grid metadata: stores count of particles in each cell
+layout(std430, binding = 2) buffer GridCounts {
+    int grid_counts[];
+};
+
+// Uniforms
+uniform float u_dt;
+uniform int u_count;
+uniform float u_force_factor;
+uniform float u_velocity_damping;
+uniform float u_interaction_range;
+uniform int u_grid_size;
+uniform float u_grid_cell_size;
+uniform int u_max_particles_per_cell;
+uniform int u_pass; // 0 = populate grid, 1 = calculate forces
+
+// Attraction matrix (6x6 = 36 elements)
+uniform float u_attraction_matrix[36];
+
+// Grid utility functions
+ivec2 getGridCoord(vec2 pos) {
+    // Convert world position (-1 to 1) to grid coordinates (0 to grid_size-1)
+    vec2 normalized = (pos + 1.0) * 0.5; // Convert to 0-1 range
+    ivec2 coord = ivec2(floor(normalized * float(u_grid_size)));
+    // Clamp to valid range
+    coord.x = clamp(coord.x, 0, u_grid_size - 1);
+    coord.y = clamp(coord.y, 0, u_grid_size - 1);
+    return coord;
+}
+
+int getGridIndex(ivec2 coord) {
+    return coord.y * u_grid_size + coord.x;
+}
+
+float calculateForce(float d, float a) {
+    float b = 0.2;
+    if (d < b) {
+        return d/b - 1.0;
+    } else if (b < d && d < 1.0) {
+        return a * (1.0 - abs(2.0 * d - 1.0 - b) / (1.0 - b));
+    } else {
+        return 0.0;
+    }
+}
+
+vec2 toroidalDistance(vec2 pos1, vec2 pos2) {
+    vec2 diff = pos2 - pos1;
+    
+    // Handle wrapping in X direction
+    if (diff.x > 1.0) diff.x -= 2.0;
+    else if (diff.x < -1.0) diff.x += 2.0;
+    
+    // Handle wrapping in Y direction
+    if (diff.y > 1.0) diff.y -= 2.0;
+    else if (diff.y < -1.0) diff.y += 2.0;
+    
+    return diff;
+}
+
+void main() {
+    uint id = gl_GlobalInvocationID.x;
+    if (id >= uint(u_count)) return;
+
+    if (u_pass == 0) {
+        // Pass 0: Populate spatial grid
+        Particle p = particles[id];
+        ivec2 gridCoord = getGridCoord(p.pos.xy);
+        int gridIndex = getGridIndex(gridCoord);
+        
+        // Atomically increment the count for this grid cell
+        int cellOffset = atomicAdd(grid_counts[gridIndex], 1);
+        
+        // If there's space in this cell, add the particle
+        if (cellOffset < u_max_particles_per_cell) {
+            int dataIndex = gridIndex * u_max_particles_per_cell + cellOffset;
+            grid_data[dataIndex] = int(id);
+        }
+    } else {
+        // Pass 1: Calculate forces using spatial grid
+        Particle p = particles[id];
+        int group_i = int(p.group.x);
+        vec2 force = vec2(0.0, 0.0);
+        
+        ivec2 currentGrid = getGridCoord(p.pos.xy);
+        
+        // Check neighboring grid cells (including current cell)
+        for (int dy = -1; dy <= 1; dy++) {
+            for (int dx = -1; dx <= 1; dx++) {
+                ivec2 neighborGrid = currentGrid + ivec2(dx, dy);
+                
+                // Handle toroidal wrapping for grid coordinates
+                neighborGrid.x = (neighborGrid.x + u_grid_size) % u_grid_size;
+                neighborGrid.y = (neighborGrid.y + u_grid_size) % u_grid_size;
+                
+                int neighborIndex = getGridIndex(neighborGrid);
+                int particleCount = grid_counts[neighborIndex];
+                
+                // Check all particles in this neighboring cell
+                for (int i = 0; i < min(particleCount, u_max_particles_per_cell); i++) {
+                    int dataIndex = neighborIndex * u_max_particles_per_cell + i;
+                    int otherId = grid_data[dataIndex];
+                    
+                    if (otherId == int(id)) continue; // Skip self
+                    
+                    Particle other = particles[otherId];
+                    int group_j = int(other.group.x);
+                    
+                    // Use toroidal distance for wrapped world
+                    vec2 dir = toroidalDistance(p.pos.xy, other.pos.xy);
+                    float dist = length(dir);
+                    
+                    // Only interact with particles within range
+                    if (dist > 0.0 && dist < u_interaction_range) {
+                        float attraction = u_attraction_matrix[group_i * 6 + group_j];
+                        // Normalize distance to 0-1 range based on interaction range
+                        float normalized_dist = dist / u_interaction_range;
+                        float force_magnitude = calculateForce(normalized_dist, attraction);
+                        
+                        vec2 force_dir = normalize(dir);
+                        force += force_dir * force_magnitude * u_force_factor;
+                    }
+                }
+            }
+        }
+
+        // Apply forces
+        p.vel.xy += force * u_dt * 0.1; // FORCE_SCALE = 0.1f
+        p.vel.xy *= u_velocity_damping;
+        
+        // Cap maximum velocity to prevent runaway particles
+        float max_velocity = 0.5;
+        float vel_magnitude = length(p.vel.xy);
+        if (vel_magnitude > max_velocity) {
+            p.vel.xy = normalize(p.vel.xy) * max_velocity;
+        }
+        
+        // Update position
+        p.pos.xy += p.vel.xy * u_dt * 1.0; // MOVEMENT_SCALE = 1.0f
+        
+        // Wrap around screen boundaries
+        if (p.pos.x > 1.0) p.pos.x = -1.0;
+        if (p.pos.x < -1.0) p.pos.x = 1.0;
+        if (p.pos.y > 1.0) p.pos.y = -1.0;
+        if (p.pos.y < -1.0) p.pos.y = 1.0;
+        
+        particles[id] = p;
+    }
+}
