@@ -12,20 +12,22 @@ layout(std430, binding = 0) buffer Particles {
     Particle particles[];
 };
 
-// Spatial grid for optimization
-// Each cell stores particle indices
+// Spatial grid
 layout(std430, binding = 1) buffer GridBuffer {
     int grid_data[];
 };
 
-// Grid metadata: stores count of particles in each cell
+// stores count of particles in each cell
 layout(std430, binding = 2) buffer GridCounts {
     int grid_counts[];
 };
 
+#define MAX_GROUPS 16
+
 // Uniforms
 uniform float u_dt;
 uniform int u_count;
+uniform int u_group_count;
 uniform float u_force_factor;
 uniform float u_velocity_damping;
 uniform float u_interaction_range;
@@ -34,15 +36,19 @@ uniform float u_grid_cell_size;
 uniform int u_max_particles_per_cell;
 uniform int u_pass; // 0 = populate grid, 1 = calculate forces
 
-// Attraction matrix (6x6 = 36 elements)
-uniform float u_attraction_matrix[36];
+// Attraction matrix
+uniform float u_attraction_matrix[MAX_GROUPS * MAX_GROUPS];
 
-// Grid utility functions
+float attraction(int gi, int gj) {
+    gi = clamp(gi, 0, u_group_count - 1);
+    gj = clamp(gj, 0, u_group_count - 1);
+    return u_attraction_matrix[gi * u_group_count + gj];
+}
+
 ivec2 getGridCoord(vec2 pos) {
     // Convert world position (-1 to 1) to grid coordinates (0 to grid_size-1)
     vec2 normalized = (pos + 1.0) * 0.5; // Convert to 0-1 range
     ivec2 coord = ivec2(floor(normalized * float(u_grid_size)));
-    // Clamp to valid range
     coord.x = clamp(coord.x, 0, u_grid_size - 1);
     coord.y = clamp(coord.y, 0, u_grid_size - 1);
     return coord;
@@ -53,7 +59,7 @@ int getGridIndex(ivec2 coord) {
 }
 
 float calculateForce(float d, float a) {
-    float b = 0.2;
+    float b = 0.3;
     if (d < b) {
         return d/b - 1.0;
     } else if (b < d && d < 1.0) {
@@ -82,12 +88,11 @@ void main() {
     if (id >= uint(u_count)) return;
 
     if (u_pass == 0) {
-        // Pass 0: Populate spatial grid
+        // Populate spatial grid
         Particle p = particles[id];
         ivec2 gridCoord = getGridCoord(p.pos.xy);
         int gridIndex = getGridIndex(gridCoord);
         
-        // Atomically increment the count for this grid cell
         int cellOffset = atomicAdd(grid_counts[gridIndex], 1);
         
         // If there's space in this cell, add the particle
@@ -96,14 +101,14 @@ void main() {
             grid_data[dataIndex] = int(id);
         }
     } else {
-        // Pass 1: Calculate forces using spatial grid
+        // Calculate forces using spatial grid
         Particle p = particles[id];
         int group_i = int(p.group.x);
         vec2 force = vec2(0.0, 0.0);
         
         ivec2 currentGrid = getGridCoord(p.pos.xy);
         
-        // Check neighboring grid cells (including current cell)
+        // Check neighboring grid cells 
         for (int dy = -1; dy <= 1; dy++) {
             for (int dx = -1; dx <= 1; dx++) {
                 ivec2 neighborGrid = currentGrid + ivec2(dx, dy);
@@ -129,10 +134,11 @@ void main() {
                     vec2 dir = toroidalDistance(p.pos.xy, other.pos.xy);
                     float dist = length(dir);
                     
-                    // Only interact with particles within range
                     if (dist > 0.0 && dist < u_interaction_range) {
-                        float attraction = u_attraction_matrix[group_i * 6 + group_j];
-                        // Normalize distance to 0-1 range based on interaction range
+                        int gi = int(p.group.x); 
+                        int gj = int(other.group.x);
+                        float attraction = attraction(gi, gj);
+                        // Normalize distance to 0-1 
                         float normalized_dist = dist / u_interaction_range;
                         float force_magnitude = calculateForce(normalized_dist, attraction);
                         
@@ -144,10 +150,10 @@ void main() {
         }
 
         // Apply forces
-        p.vel.xy += force * u_dt * 0.1; // FORCE_SCALE = 0.1f
+        p.vel.xy += force * u_dt * 0.1;
         p.vel.xy *= u_velocity_damping;
         
-        // Cap maximum velocity to prevent runaway particles
+        // Cap maximum velocity 
         float max_velocity = 0.5;
         float vel_magnitude = length(p.vel.xy);
         if (vel_magnitude > max_velocity) {
@@ -155,9 +161,9 @@ void main() {
         }
         
         // Update position
-        p.pos.xy += p.vel.xy * u_dt * 1.0; // MOVEMENT_SCALE = 1.0f
+        p.pos.xy += p.vel.xy * u_dt; 
         
-        // Wrap around screen boundaries
+        // Wrap around screen
         if (p.pos.x > 1.0) p.pos.x = -1.0;
         if (p.pos.x < -1.0) p.pos.x = 1.0;
         if (p.pos.y > 1.0) p.pos.y = -1.0;

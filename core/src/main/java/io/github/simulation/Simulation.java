@@ -36,7 +36,7 @@ public class Simulation extends ApplicationAdapter {
     private float time = 0f;
     private boolean canRun = false;
 
-    // UI components 
+    // UI components
     private SpriteBatch uiBatch;
     private BitmapFont font;
     private ShapeRenderer shapeRenderer;
@@ -116,55 +116,78 @@ public class Simulation extends ApplicationAdapter {
     private void renderStatusOverlay() {
         GLStateManager.ensureSpriteBatchCompatibility();
 
-        // Calculate background dimensions 
-        float statsBackgroundWidth = 300; 
-        float statsStartY = Gdx.graphics.getHeight() - 5;
+        float[][] matrix = RuntimeConfig.getAttractionMatrix();
+        int groupCount = (matrix != null) ? matrix.length : 0;
 
-        int lineCount = 8; 
-        float statsBackgroundHeight = lineCount * 20 - 5; // 20px per line + padding
+        // Layout constants
+        final float paddingX = 10f;
+        final float lineHeight = 20f;
+        final float minTextWidth = 300f;
+        final int cellSize = 18;
 
-        // Semi-transparent background 
+        int lineCount = 9 + 2; // 9 text + 2 spacing
+
+        float statsStartY = Gdx.graphics.getHeight() - 5f;
+
+        float matrixStartX = 200f;
+        float matrixStartY = Gdx.graphics.getHeight() - 30f;
+        float matrixWidth = groupCount * cellSize;
+        float matrixHeight = groupCount * cellSize;
+
+        float textHeight = lineCount * lineHeight - 5f;
+        float statsBackgroundWidth = Math.max(minTextWidth, matrixStartX + matrixWidth) + 15f;
+        float statsBackgroundHeight = Math.max(textHeight, matrixHeight);
+
+        // Semi-transparent background
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
-        shapeRenderer.setColor(0.2f, 0.2f, 0.2f, 0.8f); 
-        shapeRenderer.rect(0, statsStartY - statsBackgroundHeight, statsBackgroundWidth + 15,
-                statsBackgroundHeight + 10);
+        shapeRenderer.setColor(0.2f, 0.2f, 0.2f, 0.8f);
+        shapeRenderer.rect(0, statsStartY - statsBackgroundHeight, statsBackgroundWidth, statsBackgroundHeight + 10f);
         shapeRenderer.end();
 
-        renderAttractionMatrix();
+        if (groupCount > 0) {
+            renderAttractionMatrix((int) matrixStartX, (int) matrixStartY, cellSize);
+        }
 
+        // Text overlay
         uiBatch.begin();
-
         float y = statsStartY;
 
-        font.draw(uiBatch, String.format("FPS: %d", Gdx.graphics.getFramesPerSecond()), 10, y);
-        y -= 20;
-        font.draw(uiBatch, String.format("Time Scale: %.2f", RuntimeConfig.getTimeScale()), 10, y);
-        y -= 20;
-        font.draw(uiBatch, String.format("Force Factor: %.3f", RuntimeConfig.getForceFactor()), 10, y);
-        y -= 20;
-        font.draw(uiBatch, String.format("Velocity Damping: %.3f", RuntimeConfig.getVelocityDamping()), 10, y);
-        y -= 20;
-        font.draw(uiBatch, String.format("Interaction Range: %.2f", RuntimeConfig.getInteractionRange()), 10, y);
-        y -= 20;
-        font.draw(uiBatch, RuntimeGrid.getGridStatusString(), 10, y);
-        y -= 20;
-        font.draw(uiBatch, RuntimeGrid.getMaxCellString(), 10, y);
-        y -= 20;
-        font.draw(uiBatch, String.format("Particle Count: %d", SimulationConfig.PARTICLE_COUNT), 10, y);
-        y -= 20;
+        font.draw(uiBatch, String.format("FPS: %d", Gdx.graphics.getFramesPerSecond()), paddingX, y);
+        y -= lineHeight;
+        y -= lineHeight;
+
+        font.draw(uiBatch, String.format("Particle Count: %d", SimulationConfig.PARTICLE_COUNT), paddingX, y);
+        y -= lineHeight;
+        font.draw(uiBatch, String.format("Groups: %d", groupCount), paddingX, y);
+        y -= lineHeight;
+        y -= lineHeight;
+
+        font.draw(uiBatch, String.format("Time Scale: %.2f", RuntimeConfig.getTimeScale()), paddingX, y);
+        y -= lineHeight;
+        font.draw(uiBatch, String.format("Force Factor: %.3f", RuntimeConfig.getForceFactor()), paddingX, y);
+        y -= lineHeight;
+        font.draw(uiBatch, String.format("Velocity Damping: %.3f", RuntimeConfig.getVelocityDamping()), paddingX, y);
+        y -= lineHeight;
+        font.draw(uiBatch, String.format("Interaction Range: %.2f", RuntimeConfig.getInteractionRange()), paddingX, y);
+        y -= lineHeight;
+        font.draw(uiBatch, RuntimeGrid.getGridStatusString(), paddingX, y);
+        y -= lineHeight;
+        font.draw(uiBatch, RuntimeGrid.getMaxCellString(), paddingX, y);
+        y -= lineHeight;
 
         uiBatch.end();
 
         GLStateManager.ensureComputeRenderState();
     }
 
-    private void renderAttractionMatrix() {
+    private void renderAttractionMatrix(int startX, int startY, int cellSize) {
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
 
         float[][] matrix = RuntimeConfig.getAttractionMatrix();
-        int cellSize = 18;
-        int startX = 200; // Position next to the text metrics
-        int startY = Gdx.graphics.getHeight() - 30; 
+        if (matrix == null) {
+            shapeRenderer.end();
+            return;
+        }
 
         for (int i = 0; i < matrix.length; i++) {
             for (int j = 0; j < matrix[i].length; j++) {
@@ -173,7 +196,6 @@ public class Simulation extends ApplicationAdapter {
                 shapeRenderer.rect(startX + j * cellSize, startY - i * cellSize, cellSize - 1, cellSize - 1);
             }
         }
-
         shapeRenderer.end();
     }
 
@@ -186,7 +208,7 @@ public class Simulation extends ApplicationAdapter {
             return new Color(0.5f, 0, 0, Math.min(Math.abs(value), 1.0f));
         } else {
             // Gray for neutral
-            return new Color(0.24f, 0.24f, 0.24f, 0.08f);
+            return new Color(0.3f, 0.3f, 0.3f, 0.5f);
         }
     }
 

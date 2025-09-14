@@ -12,44 +12,36 @@ public class RuntimeConfig {
 
     private static float[][] attractionMatrix = copyMatrix(SimulationConfig.ATTRACTION_MATRIX);
 
-    private static final float[][][] PRESET_MATRICES = {
-            // Total repulsion
-            {
-                    { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f },
-                    { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f },
-                    { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f },
-                    { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f },
-                    { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f },
-                    { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f }
-            },
-            // Only attract same group
-            {
-                    { 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f },
-                    { 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f },
-                    { 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f },
-                    { 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f },
-                    { 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f },
-                    { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f }
-            },
-            // RGB worm 
-            {
-                    { 1.0f, -0.1f, 0.0f, 0.0f, 0.0f, 0.0f },
-                    { 0.2f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f },
-                    { 0.0f, 0.2f, 1.0f, 0.0f, 0.0f, 0.0f },
-                    { 0.0f, 0.0f, 0.2f, 1.0f, 0.0f, 0.0f },
-                    { 0.0f, 0.0f, 0.0f, 0.2f, 1.0f, 0.0f },
-                    { 0.0f, 0.0f, 0.0f, 0.0f, 0.2f, 1.0f }
-            },
-            // Max attraction with self-repulsion
-            {
-                    { -1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f },
-                    { 1.0f, -1.0f, 1.0f, 1.0f, 1.0f, 1.0f },
-                    { 1.0f, 1.0f, -1.0f, 1.0f, 1.0f, 1.0f },
-                    { 1.0f, 1.0f, 1.0f, -1.0f, 1.0f, 1.0f },
-                    { 1.0f, 1.0f, 1.0f, 1.0f, -1.0f, 1.0f },
-                    { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, -1.0f }
+    private static float[][] buildZero(int g) {
+        return new float[g][g];
+    }
+
+    protected static float[][] buildIdentity(int g) {
+        float[][] m = new float[g][g];
+        for (int i = 0; i < g; i++) {
+            m[i][i] = 1f;
+        }
+        return m;
+    }
+
+    private static float[][] buildRing(int g) { 
+        float[][] m = new float[g][g];
+        for (int i = 0; i < g; i++) {
+            m[i][i] = 0.6f;
+            m[i][(i + 1) % g] = 0.4f;
+        }
+        return m;
+    }
+
+    private static float[][] buildSelfRepelOthersAttract(int g) {
+        float[][] m = new float[g][g];
+        for (int i = 0; i < g; i++) {
+            for (int j = 0; j < g; j++) {
+                m[i][j] = (i == j) ? -1.0f : 0.8f;
             }
-    };
+        }
+        return m;
+    }
 
     public static float getTimeScale() {
         return timeScale;
@@ -127,9 +119,14 @@ public class RuntimeConfig {
         }
     }
 
-    public static void loadPreset(int presetIndex) {
-        if (presetIndex >= 0 && presetIndex < PRESET_MATRICES.length) {
-            attractionMatrix = copyMatrix(PRESET_MATRICES[presetIndex]);
+    public static void loadPreset(int idx) {
+        int g = SimulationConfig.PARTICLE_GROUPS;
+        switch (idx) {
+            case 0: attractionMatrix = buildZero(g); break;
+            case 1: attractionMatrix = buildIdentity(g); break;
+            case 2: attractionMatrix = buildRing(g); break;
+            case 3: attractionMatrix = buildSelfRepelOthersAttract(g); break;
+            default: attractionMatrix = buildIdentity(g); break;
         }
     }
 
