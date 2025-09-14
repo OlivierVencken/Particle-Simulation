@@ -1,8 +1,8 @@
 # Particle Life
 
 
-A real-time 2D particle simulation with group-based interactions.
-![Simulation Screenshot](assets/images/screenshot.png)
+A real-time 2D particle simulation with group-based interactions
+![Simulation Screenshot](assets/images/image.png)
 
 
 ## How it works 
