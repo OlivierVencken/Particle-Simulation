@@ -126,8 +126,9 @@ public class ParticleSystem {
 
         for (int i = 0; i < SimulationConfig.PARTICLE_COUNT; i++) {
             // Position 
-            float px = (float) (Math.random() * 2.0 - 1.0);
-            float py = (float) (Math.random() * 2.0 - 1.0);
+            float[] p = sampleCentralPosition();
+            float px = p[0];
+            float py = p[1];
             initial.put(px).put(py).put(0f).put(1f);
 
             // Velocity 
@@ -148,5 +149,30 @@ public class ParticleSystem {
 
         initial.flip();
         return initial;
+    }
+
+    /**
+     * Uniform distribution in the square [-1, 1] x [-1, 1].
+     * Matches the current behavior.
+     */
+    private static float[] sampleUniformPosition() {
+        float x = (float) (Math.random() * 2.0 - 1.0);
+        float y = (float) (Math.random() * 2.0 - 1.0);
+        return new float[] { x, y };
+    }
+
+    /**
+     * Center-biased distribution inside the unit disk.
+     * Uses a radial power law r = U^beta with beta > 0.5 to favor small radii,
+     * and a uniform angle. Increase CENTER_BIAS_BETA for stronger center density.
+     */
+    private static final float CENTER_BIAS_BETA = 2.0f; // > 0.5 biases toward center
+    private static float[] sampleCentralPosition() {
+        double u = Math.random();                 // [0,1)
+        double theta = Math.random() * Math.PI * 2.0;
+        double r = Math.pow(u, CENTER_BIAS_BETA); // radius in [0,1), biased small
+        float x = (float) (r * Math.cos(theta));
+        float y = (float) (r * Math.sin(theta));
+        return new float[] { x, y };
     }
 }

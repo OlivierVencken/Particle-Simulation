@@ -18,11 +18,11 @@ A real-time 2D particle simulation with group-based interactions
 ## Run
 - Windows (from project root):
 ```
-  - .\gradlew lwjgl3:run
+  .\gradlew lwjgl3:run
   ```
 - Build distributions:
 ```
-  - .\gradlew lwjgl3:distZip
+  .\gradlew lwjgl3:distZip
   ```
 
 ## Controls
