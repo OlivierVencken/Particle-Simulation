@@ -48,7 +48,7 @@ public final class SimulationConfig {
             (int) Math.ceil((PARTICLE_COUNT / (float) TOTAL_CELLS) * DENSITY_SAFETY_FACTOR));
 
     // Rendering constants
-    public static final float[] BACKGROUND_COLOR = { 0f, 0f, 0f, 1f };
+    public static final float[] BACKGROUND_COLOR = { 0f, 0f, 0f, 0f };
     public static final int WORKGROUP_SIZE = 256; 
     public static final int PARTICLE_STRIDE_FLOATS = 16; // vec4 pos + vec4 vel + vec4 col + vec4 type/group
 

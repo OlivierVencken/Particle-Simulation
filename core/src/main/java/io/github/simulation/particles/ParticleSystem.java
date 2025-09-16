@@ -126,7 +126,7 @@ public class ParticleSystem {
 
         for (int i = 0; i < SimulationConfig.PARTICLE_COUNT; i++) {
             // Position 
-            float[] p = sampleCentralPosition();
+            float[] p = sampleUniformPosition();
             float px = p[0];
             float py = p[1];
             initial.put(px).put(py).put(0f).put(1f);
@@ -166,7 +166,7 @@ public class ParticleSystem {
      * Uses a radial power law r = U^beta with beta > 0.5 to favor small radii,
      * and a uniform angle. Increase CENTER_BIAS_BETA for stronger center density.
      */
-    private static final float CENTER_BIAS_BETA = 2.0f; // > 0.5 biases toward center
+    private static final float CENTER_BIAS_BETA = 1.5f; // > 0.5 biases toward center
     private static float[] sampleCentralPosition() {
         double u = Math.random();                 // [0,1)
         double theta = Math.random() * Math.PI * 2.0;

@@ -64,7 +64,7 @@ public class Simulation extends ApplicationAdapter {
         }
 
         computeRenderer = new ComputeRenderer(shaderManager.getComputeProgram());
-        glRenderer = new GLRenderer(shaderManager.getRenderProgram());
+        glRenderer = new GLRenderer(shaderManager.getRenderProgram(), shaderManager.getBlitProgram());
 
         if (!glRenderer.initialize()) {
             canRun = false;
