@@ -98,6 +98,8 @@ public class Simulation extends ApplicationAdapter {
         float deltaTime = Gdx.graphics.getDeltaTime();
         time += deltaTime;
 
+        particleSystem.reassignGroupsIfNeeded();
+
         particleSystem.bindSSBO();
 
         particleSystem.checkAndRebuildGrid();
@@ -116,8 +118,7 @@ public class Simulation extends ApplicationAdapter {
     private void renderStatusOverlay() {
         GLStateManager.ensureSpriteBatchCompatibility();
 
-        float[][] matrix = RuntimeConfig.getAttractionMatrix();
-        int groupCount = (matrix != null) ? matrix.length : 0;
+        int groupCount = RuntimeConfig.getGroupCount();
 
         // Layout constants
         final float paddingX = 10f;

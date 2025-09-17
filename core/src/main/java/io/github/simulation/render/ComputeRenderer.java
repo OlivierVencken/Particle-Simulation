@@ -26,7 +26,7 @@ public class ComputeRenderer {
         // Set basic uniforms
         setUniform("u_dt", scaledDeltaTime);
         setUniform("u_count", RuntimeConfig.getParticleCount());
-        setUniform("u_group_count", SimulationConfig.PARTICLE_GROUPS);
+        setUniform("u_group_count", RuntimeConfig.getGroupCount());
 
         // Update runtime configuration uniforms
         setUniform("u_force_factor", RuntimeConfig.getForceFactor());
@@ -69,24 +69,24 @@ public class ComputeRenderer {
     }
 
     private void updateAttractionMatrix() {
-        int g = SimulationConfig.PARTICLE_GROUPS;
+        int g = RuntimeConfig.getGroupCount();
         float[][] m = RuntimeConfig.getAttractionMatrix();
 
-        // Flatten to 1D (row-major), sized MAX_GROUPS*MAX_GROUPS 
         int loc = GL20.glGetUniformLocation(computeProgram, "u_attraction_matrix");
-        if (loc >= 0) {
-            int max = g * g;
-            java.nio.FloatBuffer buf = java.nio.ByteBuffer
-                    .allocateDirect(max * Float.BYTES)
-                    .order(java.nio.ByteOrder.nativeOrder())
-                    .asFloatBuffer();
-            for (int i = 0; i < g; i++) {
-                for (int j = 0; j < g; j++)
-                    buf.put(m[i][j]);
-            }
-            buf.flip();
-            GL20.glUniform1fv(loc, buf);
+        if (loc < 0) {
+            return; // uniform not found
         }
+
+        int max = SimulationConfig.MAX_GROUPS * SimulationConfig.MAX_GROUPS;
+        float[] flat = new float[max];
+        int idx = 0;
+        for (int r = 0; r < g; r++) {
+            for (int c = 0; c < g; c++) {
+                flat[idx++] = m[r][c];
+            }
+        }
+        // rest already zero
+        GL20.glUniform1fv(loc, flat);
     }
 
     private void setUniform(String name, float value) {

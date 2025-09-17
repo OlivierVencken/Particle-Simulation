@@ -1,5 +1,7 @@
 package io.github.simulation.config;
 
+import io.github.simulation.util.PaletteUtil;
+
 /**
  * Runtime configuration manager for dynamic parameter changes during simulation
  */
@@ -7,12 +9,52 @@ public class RuntimeConfig {
 
     private static int particleCount = SimulationConfig.PARTICLE_COUNT;
 
+    private static int groupCount = SimulationConfig.PARTICLE_GROUPS;
+    private static float[][] groupColors = PaletteUtil.generateEvenHue(groupCount);
+    private static boolean groupsChanged = false;
+
     private static float timeScale = 1.0f;
     private static float forceFactor = SimulationConfig.FORCE_FACTOR;
     private static float velocityDamping = SimulationConfig.VELOCITY_DAMPING;
     private static float interactionRange = SimulationConfig.INTERACTION_RANGE;
 
     private static float[][] attractionMatrix = copyMatrix(SimulationConfig.ATTRACTION_MATRIX);
+
+    public static int getGroupCount() {
+        return groupCount;
+    }
+
+    public static float[][] getGroupColors() {
+        return groupColors;
+    }
+
+    public static void increaseGroupCount() {
+        setGroupCount(groupCount + 1);
+    }
+
+    public static void decreaseGroupCount() {
+        setGroupCount(groupCount - 1);
+    }
+
+    public static void setGroupCount(int newCount) {
+        newCount = Math.max(1, Math.min(SimulationConfig.MAX_GROUPS, newCount));
+        if (newCount == groupCount)
+            return;
+        groupCount = newCount;
+        // Reset attraction matrix to identity (default)
+        attractionMatrix = buildIdentity(groupCount);
+        // Regenerate palette
+        groupColors = PaletteUtil.generateEvenHue(groupCount);
+        groupsChanged = true;
+    }
+
+    public static boolean consumeGroupsChanged() {
+        if (groupsChanged) {
+            groupsChanged = false;
+            return true;
+        }
+        return false;
+    }
 
     private static float[][] buildZero(int g) {
         return new float[g][g];
@@ -122,8 +164,8 @@ public class RuntimeConfig {
     }
 
     public static void randomizeAttractionMatrix() {
-        for (int i = 0; i < SimulationConfig.PARTICLE_GROUPS; i++) {
-            for (int j = 0; j < SimulationConfig.PARTICLE_GROUPS; j++) {
+        for (int i = 0; i < RuntimeConfig.getGroupCount(); i++) {
+            for (int j = 0; j < RuntimeConfig.getGroupCount(); j++) {
                 attractionMatrix[i][j] = (float) (Math.random() * 2.0 - 1.0); // -1 to 1
             }
         }

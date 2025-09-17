@@ -62,6 +62,14 @@ public class SimulationInputProcessor extends InputAdapter {
                 particleSystem.removeRandomParticles(500);
                 return true;
 
+            // Group count control
+            case Input.Keys.LEFT_BRACKET: // decrease groups
+                RuntimeConfig.decreaseGroupCount();
+                return true;
+            case Input.Keys.RIGHT_BRACKET: // increase groups
+                RuntimeConfig.increaseGroupCount();
+                return true;
+
             // Attraction matrix control
             case Input.Keys.SPACE:
                 RuntimeConfig.randomizeAttractionMatrix();

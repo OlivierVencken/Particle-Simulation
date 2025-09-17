@@ -13,6 +13,7 @@ public final class SimulationConfig {
     // Particle groups
     // Max group count = 16 --> computer shader
     public static final int PARTICLE_GROUPS = 10;
+    public static final int MAX_GROUPS = 16;
     public static final float[][] GROUP_COLORS = PaletteUtil.generateEvenHue(PARTICLE_GROUPS);
 
     // Attraction matrix - values between -1 and 1
@@ -51,6 +52,10 @@ public final class SimulationConfig {
     public static final float[] BACKGROUND_COLOR = { 0f, 0f, 0f, 0f };
     public static final int WORKGROUP_SIZE = 256; 
     public static final int PARTICLE_STRIDE_FLOATS = 16; // vec4 pos + vec4 vel + vec4 col + vec4 type/group
+    public static final int OFFSET_POS    = 0;   // 4 floats
+    public static final int OFFSET_VEL    = 4;   // 4 floats
+    public static final int OFFSET_COLOR  = 8;   // 4 floats
+    public static final int OFFSET_META   = 12;  // 4 floats
 
     // Default attraction matrix preset
     private static float[][] identity(int n) {

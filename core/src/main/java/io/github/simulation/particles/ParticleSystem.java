@@ -42,7 +42,7 @@ public class ParticleSystem {
             FloatBuffer seed = createInitialParticleData(count);
             GL15.glBufferSubData(GL43.GL_SHADER_STORAGE_BUFFER, 0, seed);
         }
-        particleCapacity = count; // capacity == current count initially
+        particleCapacity = count; 
         RuntimeConfig.setParticleCount(count);
     }
 
@@ -88,9 +88,7 @@ public class ParticleSystem {
         int newCount = current;
 
         GL15.glBindBuffer(GL43.GL_SHADER_STORAGE_BUFFER, particleSSBO);
-        // Map once
-        long totalBytes = (long) particleCapacity * SimulationConfig.PARTICLE_STRIDE_FLOATS * Float.BYTES;
-        // READ_WRITE mapping (simple & safe for moderate sizes)
+        // READ_WRITE mapping 
         java.nio.ByteBuffer bb = GL15.glMapBuffer(GL43.GL_SHADER_STORAGE_BUFFER, GL15.GL_READ_WRITE);
         if (bb == null) {
             return; // mapping failed
@@ -118,6 +116,46 @@ public class ParticleSystem {
         }
         GL15.glUnmapBuffer(GL43.GL_SHADER_STORAGE_BUFFER);
         RuntimeConfig.setParticleCount(newCount);
+    }
+
+    public void reassignGroupsIfNeeded() {
+        if (!RuntimeConfig.consumeGroupsChanged()) {
+            return;
+        }
+
+        int current = RuntimeConfig.getParticleCount();
+        if (current == 0) {
+            return;
+        }
+
+        int gCount = RuntimeConfig.getGroupCount();
+        float[][] palette = RuntimeConfig.getGroupColors();
+
+        GL15.glBindBuffer(GL43.GL_SHADER_STORAGE_BUFFER, particleSSBO);
+        java.nio.ByteBuffer bb = GL15.glMapBuffer(GL43.GL_SHADER_STORAGE_BUFFER, GL15.GL_READ_WRITE);
+        if (bb == null) {
+            return;
+        }
+        java.nio.FloatBuffer fb = bb.asFloatBuffer();
+
+        int stride = SimulationConfig.PARTICLE_STRIDE_FLOATS;
+        for (int i = 0; i < current; i++) {
+            int base = i * stride;
+            int groupId = i % gCount;
+
+            // color offset 
+            int colBase = base + SimulationConfig.OFFSET_COLOR;
+            float[] col = palette[groupId];
+            fb.put(colBase, col[0]);
+            fb.put(colBase + 1, col[1]);
+            fb.put(colBase + 2, col[2]);
+            fb.put(colBase + 3, col[3]);
+
+            // meta/group id offset 
+            fb.put(base + SimulationConfig.OFFSET_META, (float) groupId);
+        }
+
+        GL15.glUnmapBuffer(GL43.GL_SHADER_STORAGE_BUFFER);
     }
 
     // Grow capacity preserving existing particle data
