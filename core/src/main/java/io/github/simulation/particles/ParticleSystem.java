@@ -3,6 +3,7 @@ package io.github.simulation.particles;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.*;
 import io.github.simulation.config.SimulationConfig;
+import io.github.simulation.config.RuntimeConfig;
 import io.github.simulation.config.RuntimeGrid;
 
 import java.nio.FloatBuffer;
@@ -16,23 +17,137 @@ public class ParticleSystem {
     private int particleSSBO = 0;
     private int gridDataSSBO = 0;
     private int gridCountsSSBO = 0;
+    private int particleCapacity = 0;
 
     public boolean initialize() {
-        // Create particle SSBO
+        int startCount = RuntimeConfig.getParticleCount();
+        createParticleBuffer(startCount);
+        createGridBuffers();
+        GL15.glBindBuffer(GL43.GL_SHADER_STORAGE_BUFFER, 0);
+        return true;
+    }
+
+    private void createParticleBuffer(int count) {
+        if (particleSSBO != 0) {
+            GL15.glDeleteBuffers(particleSSBO);
+        }
         particleSSBO = GL15.glGenBuffers();
         GL15.glBindBuffer(GL43.GL_SHADER_STORAGE_BUFFER, particleSSBO);
 
-        FloatBuffer initial = createInitialParticleData();
-
-        GL15.glBufferData(GL43.GL_SHADER_STORAGE_BUFFER, initial, GL15.GL_DYNAMIC_DRAW);
+        long bytes = (long) count * SimulationConfig.PARTICLE_STRIDE_FLOATS * Float.BYTES;
+        GL15.glBufferData(GL43.GL_SHADER_STORAGE_BUFFER, bytes, GL15.GL_DYNAMIC_DRAW);
         GL30.glBindBufferBase(GL43.GL_SHADER_STORAGE_BUFFER, 0, particleSSBO);
 
-        // Create spatial grid buffers
-        createGridBuffers();
+        if (count > 0) {
+            FloatBuffer seed = createInitialParticleData(count);
+            GL15.glBufferSubData(GL43.GL_SHADER_STORAGE_BUFFER, 0, seed);
+        }
+        particleCapacity = count; // capacity == current count initially
+        RuntimeConfig.setParticleCount(count);
+    }
 
-        GL15.glBindBuffer(GL43.GL_SHADER_STORAGE_BUFFER, 0);
+    private void createGridBuffers() {
+        int totalCells = RuntimeGrid.getGridSize() * RuntimeGrid.getGridSize();
+        int gridDataSize = totalCells * RuntimeGrid.getMaxParticlesPerCell();
 
-        return true;
+        // Grid data buffer --> stores particle indices for each cell
+        gridDataSSBO = GL15.glGenBuffers();
+        GL15.glBindBuffer(GL43.GL_SHADER_STORAGE_BUFFER, gridDataSSBO);
+        GL15.glBufferData(GL43.GL_SHADER_STORAGE_BUFFER, gridDataSize * Integer.BYTES, GL15.GL_DYNAMIC_DRAW);
+        GL30.glBindBufferBase(GL43.GL_SHADER_STORAGE_BUFFER, 1, gridDataSSBO);
+
+        // Grid counts buffer --> stores count of particles in each cell
+        gridCountsSSBO = GL15.glGenBuffers();
+        GL15.glBindBuffer(GL43.GL_SHADER_STORAGE_BUFFER, gridCountsSSBO);
+        GL15.glBufferData(GL43.GL_SHADER_STORAGE_BUFFER, totalCells * Integer.BYTES, GL15.GL_DYNAMIC_DRAW);
+        GL30.glBindBufferBase(GL43.GL_SHADER_STORAGE_BUFFER, 2, gridCountsSSBO);
+    }
+
+    public void addRandomParticles(int n) {
+        if (n <= 0)
+            return;
+        int current = RuntimeConfig.getParticleCount();
+        int needed = current + n;
+        if (needed > particleCapacity) {
+            growCapacity(Math.max(needed, particleCapacity * 2));
+        }
+        // Generate new particle data
+        FloatBuffer data = createInitialParticleData(n);
+        long strideBytes = (long) SimulationConfig.PARTICLE_STRIDE_FLOATS * Float.BYTES;
+        long dstOffset = (long) current * strideBytes;
+        GL15.glBindBuffer(GL43.GL_SHADER_STORAGE_BUFFER, particleSSBO);
+        GL15.glBufferSubData(GL43.GL_SHADER_STORAGE_BUFFER, dstOffset, data);
+        RuntimeConfig.setParticleCount(needed);
+    }
+
+    public void removeRandomParticles(int n) {
+        int current = RuntimeConfig.getParticleCount();
+        if (n <= 0 || current == 0)
+            return;
+        n = Math.min(n, current);
+        int newCount = current;
+
+        GL15.glBindBuffer(GL43.GL_SHADER_STORAGE_BUFFER, particleSSBO);
+        // Map once
+        long totalBytes = (long) particleCapacity * SimulationConfig.PARTICLE_STRIDE_FLOATS * Float.BYTES;
+        // READ_WRITE mapping (simple & safe for moderate sizes)
+        java.nio.ByteBuffer bb = GL15.glMapBuffer(GL43.GL_SHADER_STORAGE_BUFFER, GL15.GL_READ_WRITE);
+        if (bb == null) {
+            return; // mapping failed
+        }
+        java.nio.FloatBuffer fb = bb.asFloatBuffer();
+        int strideFloats = SimulationConfig.PARTICLE_STRIDE_FLOATS;
+
+        java.util.concurrent.ThreadLocalRandom rng = java.util.concurrent.ThreadLocalRandom.current();
+
+        for (int k = 0; k < n; k++) {
+            if (newCount == 0)
+                break;
+            int removeIndex = rng.nextInt(newCount);
+            int lastIndex = newCount - 1;
+            if (removeIndex != lastIndex) {
+                int baseA = removeIndex * strideFloats;
+                int baseB = lastIndex * strideFloats;
+                // Swap (move last into removeIndex)
+                for (int i = 0; i < strideFloats; i++) {
+                    float v = fb.get(baseB + i);
+                    fb.put(baseA + i, v);
+                }
+            }
+            newCount--;
+        }
+        GL15.glUnmapBuffer(GL43.GL_SHADER_STORAGE_BUFFER);
+        RuntimeConfig.setParticleCount(newCount);
+    }
+
+    // Grow capacity preserving existing particle data
+    private void growCapacity(int newCapacity) {
+        if (newCapacity <= particleCapacity) {
+            return;
+        }
+
+        int currentCount = RuntimeConfig.getParticleCount();
+
+        // Allocate new buffer sized exactly to newCapacity
+        int newBuffer = GL15.glGenBuffers();
+        long newBytes = (long) newCapacity * SimulationConfig.PARTICLE_STRIDE_FLOATS * Float.BYTES;
+        GL15.glBindBuffer(GL43.GL_SHADER_STORAGE_BUFFER, newBuffer);
+        GL15.glBufferData(GL43.GL_SHADER_STORAGE_BUFFER, newBytes, GL15.GL_DYNAMIC_DRAW);
+
+        // Copy existing particle data if any
+        if (currentCount > 0) {
+            long copyBytes = (long) currentCount * SimulationConfig.PARTICLE_STRIDE_FLOATS * Float.BYTES;
+            GL15.glBindBuffer(GL31.GL_COPY_READ_BUFFER, particleSSBO);
+            GL15.glBindBuffer(GL31.GL_COPY_WRITE_BUFFER, newBuffer);
+            GL31.glCopyBufferSubData(GL31.GL_COPY_READ_BUFFER, GL31.GL_COPY_WRITE_BUFFER, 0, 0, copyBytes);
+        }
+
+        // Bind new buffer as SSBO 0 and delete old
+        GL30.glBindBufferBase(GL43.GL_SHADER_STORAGE_BUFFER, 0, newBuffer);
+        GL15.glDeleteBuffers(particleSSBO);
+
+        particleSSBO = newBuffer;
+        particleCapacity = newCapacity;
     }
 
     public void checkAndRebuildGrid() {
@@ -56,27 +171,6 @@ public class ParticleSystem {
         createGridBuffers();
     }
 
-    private void createGridBuffers() {
-        int totalCells = RuntimeGrid.getGridSize() * RuntimeGrid.getGridSize();
-        int gridDataSize = totalCells * RuntimeGrid.getMaxParticlesPerCell();
-
-        // Grid data buffer --> stores particle indices for each cell
-        gridDataSSBO = GL15.glGenBuffers();
-        GL15.glBindBuffer(GL43.GL_SHADER_STORAGE_BUFFER, gridDataSSBO);
-        GL15.glBufferData(GL43.GL_SHADER_STORAGE_BUFFER, gridDataSize * Integer.BYTES, GL15.GL_DYNAMIC_DRAW);
-        GL30.glBindBufferBase(GL43.GL_SHADER_STORAGE_BUFFER, 1, gridDataSSBO);
-
-        // Grid counts buffer --> stores count of particles in each cell
-        gridCountsSSBO = GL15.glGenBuffers();
-        GL15.glBindBuffer(GL43.GL_SHADER_STORAGE_BUFFER, gridCountsSSBO);
-        GL15.glBufferData(GL43.GL_SHADER_STORAGE_BUFFER, totalCells * Integer.BYTES, GL15.GL_DYNAMIC_DRAW);
-        GL30.glBindBufferBase(GL43.GL_SHADER_STORAGE_BUFFER, 2, gridCountsSSBO);
-    }
-
-    public int getSSBO() {
-        return particleSSBO;
-    }
-
     public void bindSSBO() {
         GL15.glBindBuffer(GL43.GL_SHADER_STORAGE_BUFFER, particleSSBO);
         GL30.glBindBufferBase(GL43.GL_SHADER_STORAGE_BUFFER, 0, particleSSBO);
@@ -86,6 +180,10 @@ public class ParticleSystem {
 
         GL15.glBindBuffer(GL43.GL_SHADER_STORAGE_BUFFER, gridCountsSSBO);
         GL30.glBindBufferBase(GL43.GL_SHADER_STORAGE_BUFFER, 2, gridCountsSSBO);
+    }
+
+    public int getSSBO() {
+        return particleSSBO;
     }
 
     public void clearGrid() {
@@ -120,33 +218,26 @@ public class ParticleSystem {
         }
     }
 
-    private FloatBuffer createInitialParticleData() {
-        FloatBuffer initial = BufferUtils.createFloatBuffer(
-                SimulationConfig.PARTICLE_COUNT * SimulationConfig.PARTICLE_STRIDE_FLOATS);
+    private FloatBuffer createInitialParticleData(int count) {
+        FloatBuffer initial = BufferUtils.createFloatBuffer(count * SimulationConfig.PARTICLE_STRIDE_FLOATS);
+        int groups = SimulationConfig.PARTICLE_GROUPS;
+        for (int i = 0; i < count; i++) {
+            // Assign a group
+            int groupId = i % groups;
 
-        for (int i = 0; i < SimulationConfig.PARTICLE_COUNT; i++) {
-            // Position 
-            float[] p = sampleUniformPosition();
-            float px = p[0];
-            float py = p[1];
-            initial.put(px).put(py).put(0f).put(1f);
+            float[] p = sampleCentralPosition();
+            initial.put(p[0]).put(p[1]).put(0f).put(1f); // pos (w=1)
 
-            // Velocity 
-            float vx = 0.0f; 
-            float vy = 0.0f;
-            initial.put(vx).put(vy).put(0f).put(0f);
+            // Velocity
+            initial.put(0f).put(0f).put(0f).put(0f);
 
-            // Assign particle to a group 
-            int group = i % SimulationConfig.PARTICLE_GROUPS;
-            float[] groupColor = SimulationConfig.GROUP_COLORS[group];
+            // Color
+            float[] col = SimulationConfig.GROUP_COLORS[groupId];
+            initial.put(col[0]).put(col[1]).put(col[2]).put(col[3]);
 
-            // Color 
-            initial.put(groupColor[0]).put(groupColor[1]).put(groupColor[2]).put(groupColor[3]);
-
-            // Group/Type information --> store group index in x component
-            initial.put((float) group).put(0f).put(0f).put(0f);
+            // x = group id
+            initial.put((float) groupId).put(0f).put(0f).put(0f);
         }
-
         initial.flip();
         return initial;
     }
@@ -167,8 +258,9 @@ public class ParticleSystem {
      * and a uniform angle. Increase CENTER_BIAS_BETA for stronger center density.
      */
     private static final float CENTER_BIAS_BETA = 1.5f; // > 0.5 biases toward center
+
     private static float[] sampleCentralPosition() {
-        double u = Math.random();                 // [0,1)
+        double u = Math.random(); // [0,1)
         double theta = Math.random() * Math.PI * 2.0;
         double r = Math.pow(u, CENTER_BIAS_BETA); // radius in [0,1), biased small
         float x = (float) (r * Math.cos(theta));

@@ -5,6 +5,8 @@ package io.github.simulation.config;
  */
 public class RuntimeConfig {
 
+    private static int particleCount = SimulationConfig.PARTICLE_COUNT;
+
     private static float timeScale = 1.0f;
     private static float forceFactor = SimulationConfig.FORCE_FACTOR;
     private static float velocityDamping = SimulationConfig.VELOCITY_DAMPING;
@@ -24,7 +26,7 @@ public class RuntimeConfig {
         return m;
     }
 
-    private static float[][] buildRing(int g) { 
+    private static float[][] buildRing(int g) {
         float[][] m = new float[g][g];
         for (int i = 0; i < g; i++) {
             m[i][i] = 0.6f;
@@ -41,6 +43,14 @@ public class RuntimeConfig {
             }
         }
         return m;
+    }
+
+    public static int getParticleCount() {
+        return particleCount;
+    }
+
+    public static void setParticleCount(int value) {
+        particleCount = Math.max(0, value);
     }
 
     public static float getTimeScale() {
@@ -122,11 +132,21 @@ public class RuntimeConfig {
     public static void loadPreset(int idx) {
         int g = SimulationConfig.PARTICLE_GROUPS;
         switch (idx) {
-            case 0: attractionMatrix = buildZero(g); break;
-            case 1: attractionMatrix = buildIdentity(g); break;
-            case 2: attractionMatrix = buildRing(g); break;
-            case 3: attractionMatrix = buildSelfRepelOthersAttract(g); break;
-            default: attractionMatrix = buildIdentity(g); break;
+            case 0:
+                attractionMatrix = buildZero(g);
+                break;
+            case 1:
+                attractionMatrix = buildIdentity(g);
+                break;
+            case 2:
+                attractionMatrix = buildRing(g);
+                break;
+            case 3:
+                attractionMatrix = buildSelfRepelOthersAttract(g);
+                break;
+            default:
+                attractionMatrix = buildIdentity(g);
+                break;
         }
     }
 

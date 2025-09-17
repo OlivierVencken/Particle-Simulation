@@ -4,6 +4,8 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.utils.ScreenUtils;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.*;
+
+import io.github.simulation.config.RuntimeConfig;
 import io.github.simulation.config.SimulationConfig;
 import io.github.simulation.gl.GLStateManager;
 
@@ -70,7 +72,7 @@ public class GLRenderer {
         setUniform1f(renderProgram, "u_PointSize", SimulationConfig.PARTICLE_SIZE_PX);
 
         GL30.glBindVertexArray(vao);
-        GL31.glDrawArraysInstanced(GL11.GL_POINTS, 0, 1, SimulationConfig.PARTICLE_COUNT);
+        GL31.glDrawArraysInstanced(GL11.GL_POINTS, 0, 1, RuntimeConfig.getParticleCount());
         GL30.glBindVertexArray(0);
         GL20.glUseProgram(0);
 

@@ -2,6 +2,8 @@ package io.github.simulation.gl;
 
 import com.badlogic.gdx.Gdx;
 import org.lwjgl.opengl.GL;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GLCapabilities;
 
 /**
@@ -15,13 +17,11 @@ public class GLCapabilitiesChecker {
         GLCapabilities caps = GL.getCapabilities();
 
         if (logDetails) {
-            Gdx.app.log("GL", "GL_VERSION: " + org.lwjgl.opengl.GL11.glGetString(org.lwjgl.opengl.GL11.GL_VERSION));
+            Gdx.app.log("GL", "GL_VERSION: " + GL11.glGetString(GL11.GL_VERSION));
             Gdx.app.log("GL", "GLSL VERSION: "
-                    + org.lwjgl.opengl.GL20.glGetString(org.lwjgl.opengl.GL20.GL_SHADING_LANGUAGE_VERSION));
+                    + GL20.glGetString(GL20.GL_SHADING_LANGUAGE_VERSION));
             Gdx.app.log("GL", "caps.OpenGL43: " + caps.OpenGL43);
             Gdx.app.log("GL", "caps.GL_ARB_compute_shader: " + caps.GL_ARB_compute_shader);
-
-            
         }
 
         computeShaderSupported = caps.OpenGL43 || caps.GL_ARB_compute_shader;

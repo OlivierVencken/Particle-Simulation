@@ -25,7 +25,7 @@ public class ComputeRenderer {
 
         // Set basic uniforms
         setUniform("u_dt", scaledDeltaTime);
-        setUniform("u_count", SimulationConfig.PARTICLE_COUNT);
+        setUniform("u_count", RuntimeConfig.getParticleCount());
         setUniform("u_group_count", SimulationConfig.PARTICLE_GROUPS);
 
         // Update runtime configuration uniforms
@@ -38,8 +38,16 @@ public class ComputeRenderer {
 
         updateAttractionMatrix();
 
+        // skip if no particles
+        int particleCount = RuntimeConfig.getParticleCount();
+        if (particleCount == 0) {
+            // Nothing to process; avoid invalid dispatch (0 workgroups)
+            GL20.glUseProgram(0);
+            return;
+        }
+
         // Calculate dispatch groups
-        int groups = (SimulationConfig.PARTICLE_COUNT + SimulationConfig.WORKGROUP_SIZE - 1)
+        int groups = (particleCount + SimulationConfig.WORKGROUP_SIZE - 1)
                 / SimulationConfig.WORKGROUP_SIZE;
 
         // Populate spatial grid

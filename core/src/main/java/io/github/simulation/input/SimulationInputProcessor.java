@@ -6,11 +6,17 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 
 import io.github.simulation.config.RuntimeConfig;
+import io.github.simulation.particles.ParticleSystem;
 
 /**
  * Handles keyboard input 
  */
 public class SimulationInputProcessor extends InputAdapter {
+
+    private final ParticleSystem particleSystem;
+    public SimulationInputProcessor(ParticleSystem ps) {
+        this.particleSystem = ps;
+    }
 
     @Override
     public boolean keyDown(int keycode) {
@@ -45,6 +51,15 @@ public class SimulationInputProcessor extends InputAdapter {
                 return true;
             case Input.Keys.K:
                 RuntimeConfig.decreaseInteractionRange();
+                return true;
+            
+            // Particle count control
+            case Input.Keys.EQUALS: 
+            case Input.Keys.PLUS:
+                particleSystem.addRandomParticles(500);
+                return true;
+            case Input.Keys.MINUS:  
+                particleSystem.removeRandomParticles(500);
                 return true;
 
             // Attraction matrix control

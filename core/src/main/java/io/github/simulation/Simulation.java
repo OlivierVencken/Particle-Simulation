@@ -80,7 +80,7 @@ public class Simulation extends ApplicationAdapter {
     }
 
     private void setupInputHandling() {
-        simInputProcessor = new SimulationInputProcessor();
+        simInputProcessor = new SimulationInputProcessor(particleSystem);
         InputMultiplexer multiplexer = new InputMultiplexer();
         multiplexer.addProcessor(simInputProcessor);
         Gdx.input.setInputProcessor(multiplexer);
@@ -156,7 +156,7 @@ public class Simulation extends ApplicationAdapter {
         y -= lineHeight;
         y -= lineHeight;
 
-        font.draw(uiBatch, String.format("Particle Count: %d", SimulationConfig.PARTICLE_COUNT), paddingX, y);
+        font.draw(uiBatch, String.format("Particle Count: %d", RuntimeConfig.getParticleCount()), paddingX, y);
         y -= lineHeight;
         font.draw(uiBatch, String.format("Groups: %d", groupCount), paddingX, y);
         y -= lineHeight;
