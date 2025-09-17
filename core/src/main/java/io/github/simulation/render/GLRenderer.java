@@ -69,7 +69,7 @@ public class GLRenderer {
 
         // For square offscreen we do not need horizontal squeeze
         setUniform1f(renderProgram, "u_AspectScale", 1.0f);
-        setUniform1f(renderProgram, "u_PointSize", SimulationConfig.PARTICLE_SIZE_PX);
+        setUniform1f(renderProgram, "u_PointSize", RuntimeConfig.getParticleSizePx());
 
         GL30.glBindVertexArray(vao);
         GL31.glDrawArraysInstanced(GL11.GL_POINTS, 0, 1, RuntimeConfig.getParticleCount());

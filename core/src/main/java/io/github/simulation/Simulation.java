@@ -8,7 +8,6 @@ import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import io.github.simulation.config.RuntimeConfig;
-import io.github.simulation.config.SimulationConfig;
 import io.github.simulation.config.RuntimeGrid;
 import io.github.simulation.gl.GLCapabilitiesChecker;
 import io.github.simulation.gl.GLStateManager;

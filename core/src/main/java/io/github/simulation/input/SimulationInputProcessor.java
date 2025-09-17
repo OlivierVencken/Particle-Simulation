@@ -62,6 +62,14 @@ public class SimulationInputProcessor extends InputAdapter {
                 particleSystem.removeRandomParticles(500);
                 return true;
 
+            // Particle size control
+            case Input.Keys.PAGE_UP:
+                RuntimeConfig.increaseParticleSize();
+                return true;
+            case Input.Keys.PAGE_DOWN:
+                RuntimeConfig.decreaseParticleSize();
+                return true;
+
             // Group count control
             case Input.Keys.LEFT_BRACKET: // decrease groups
                 RuntimeConfig.decreaseGroupCount();

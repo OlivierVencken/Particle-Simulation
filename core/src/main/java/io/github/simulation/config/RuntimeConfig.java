@@ -8,9 +8,10 @@ import io.github.simulation.util.PaletteUtil;
 public class RuntimeConfig {
 
     private static int particleCount = SimulationConfig.PARTICLE_COUNT;
+    private static float particleSizePx = SimulationConfig.PARTICLE_SIZE_PX;
 
     private static int groupCount = SimulationConfig.PARTICLE_GROUPS;
-    private static float[][] groupColors = PaletteUtil.generateEvenHue(groupCount);
+    private static float[][] groupColors = SimulationConfig.GROUP_COLORS;
     private static boolean groupsChanged = false;
 
     private static float timeScale = 1.0f;
@@ -36,25 +37,7 @@ public class RuntimeConfig {
         setGroupCount(groupCount - 1);
     }
 
-    public static void setGroupCount(int newCount) {
-        newCount = Math.max(1, Math.min(SimulationConfig.MAX_GROUPS, newCount));
-        if (newCount == groupCount)
-            return;
-        groupCount = newCount;
-        // Reset attraction matrix to identity (default)
-        attractionMatrix = buildIdentity(groupCount);
-        // Regenerate palette
-        groupColors = PaletteUtil.generateEvenHue(groupCount);
-        groupsChanged = true;
-    }
-
-    public static boolean consumeGroupsChanged() {
-        if (groupsChanged) {
-            groupsChanged = false;
-            return true;
-        }
-        return false;
-    }
+    
 
     private static float[][] buildZero(int g) {
         return new float[g][g];
@@ -93,6 +76,42 @@ public class RuntimeConfig {
 
     public static void setParticleCount(int value) {
         particleCount = Math.max(0, value);
+    }
+
+    public static float getParticleSizePx() {
+        return particleSizePx;
+    }
+
+    public static void setParticleSizePx(float v) {
+        particleSizePx = Math.clamp(v, 1.0f, 32.0f);
+    }
+
+    public static void increaseParticleSize() {
+        setParticleSizePx(particleSizePx + 0.5f);
+    }
+
+    public static void decreaseParticleSize() {
+        setParticleSizePx(particleSizePx - 0.5f);
+    }
+
+    public static void setGroupCount(int newCount) {
+        newCount = Math.clamp(newCount, 1, SimulationConfig.MAX_GROUPS);
+        if (newCount == groupCount)
+            return;
+        groupCount = newCount;
+        // Reset attraction matrix to identity (default)
+        attractionMatrix = buildIdentity(groupCount);
+        // Regenerate palette
+        groupColors = PaletteUtil.generateEvenHue(groupCount);
+        groupsChanged = true;
+    }
+
+    public static boolean consumeGroupsChanged() {
+        if (groupsChanged) {
+            groupsChanged = false;
+            return true;
+        }
+        return false;
     }
 
     public static float getTimeScale() {
