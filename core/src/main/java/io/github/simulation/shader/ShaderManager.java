@@ -23,7 +23,7 @@ public class ShaderManager {
         String computeShaderSource = Gdx.files.internal("shaders/particle.comp").readString();
         computeProgram = createComputeProgram(computeShaderSource);
 
-        // Blit program (for compositing the offscreen square)
+        // Blit program 
         String blitVert = Gdx.files.internal("shaders/blit.vert").readString();
         String blitFrag = Gdx.files.internal("shaders/blit.frag").readString();
         blitProgram = createProgram(blitVert, blitFrag);

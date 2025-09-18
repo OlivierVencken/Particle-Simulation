@@ -1,5 +1,6 @@
 package io.github.simulation.config;
 
+import io.github.simulation.particles.ParticleSystem;
 import io.github.simulation.util.PaletteUtil;
 
 /**
@@ -20,54 +21,12 @@ public class RuntimeConfig {
     private static float interactionRange = SimulationConfig.INTERACTION_RANGE;
 
     private static float[][] attractionMatrix = copyMatrix(SimulationConfig.ATTRACTION_MATRIX);
+    private static Distribution distribution = SimulationConfig.DISTRIBUTION;
 
-    public static int getGroupCount() {
-        return groupCount;
-    }
-
-    public static float[][] getGroupColors() {
-        return groupColors;
-    }
-
-    public static void increaseGroupCount() {
-        setGroupCount(groupCount + 1);
-    }
-
-    public static void decreaseGroupCount() {
-        setGroupCount(groupCount - 1);
-    }
-
-    
-
-    private static float[][] buildZero(int g) {
-        return new float[g][g];
-    }
-
-    protected static float[][] buildIdentity(int g) {
-        float[][] m = new float[g][g];
-        for (int i = 0; i < g; i++) {
-            m[i][i] = 1f;
-        }
-        return m;
-    }
-
-    private static float[][] buildRing(int g) {
-        float[][] m = new float[g][g];
-        for (int i = 0; i < g; i++) {
-            m[i][i] = 0.6f;
-            m[i][(i + 1) % g] = 0.4f;
-        }
-        return m;
-    }
-
-    private static float[][] buildSelfRepelOthersAttract(int g) {
-        float[][] m = new float[g][g];
-        for (int i = 0; i < g; i++) {
-            for (int j = 0; j < g; j++) {
-                m[i][j] = (i == j) ? -1.0f : 0.8f;
-            }
-        }
-        return m;
+    public enum Distribution {
+        UNIFORM,
+        CENTER_BIASED,
+        GAUSSIAN
     }
 
     public static int getParticleCount() {
@@ -94,10 +53,27 @@ public class RuntimeConfig {
         setParticleSizePx(particleSizePx - 0.5f);
     }
 
+    public static int getGroupCount() {
+        return groupCount;
+    }
+
+    public static float[][] getGroupColors() {
+        return groupColors;
+    }
+
+    public static void increaseGroupCount() {
+        setGroupCount(groupCount + 1);
+    }
+
+    public static void decreaseGroupCount() {
+        setGroupCount(groupCount - 1);
+    }
+
     public static void setGroupCount(int newCount) {
         newCount = Math.clamp(newCount, 1, SimulationConfig.MAX_GROUPS);
-        if (newCount == groupCount)
+        if (newCount == groupCount) {
             return;
+        }
         groupCount = newCount;
         // Reset attraction matrix to identity (default)
         attractionMatrix = buildIdentity(groupCount);
@@ -211,12 +187,54 @@ public class RuntimeConfig {
         }
     }
 
-    public static void resetToDefaults() {
+    private static float[][] buildZero(int g) {
+        return new float[g][g];
+    }
+
+    protected static float[][] buildIdentity(int g) {
+        float[][] m = new float[g][g];
+        for (int i = 0; i < g; i++) {
+            m[i][i] = 1f;
+        }
+        return m;
+    }
+
+    private static float[][] buildRing(int g) {
+        float[][] m = new float[g][g];
+        for (int i = 0; i < g; i++) {
+            m[i][i] = 0.6f;
+            m[i][(i + 1) % g] = 0.4f;
+        }
+        return m;
+    }
+
+    private static float[][] buildSelfRepelOthersAttract(int g) {
+        float[][] m = new float[g][g];
+        for (int i = 0; i < g; i++) {
+            for (int j = 0; j < g; j++) {
+                m[i][j] = (i == j) ? -1.0f : 0.8f;
+            }
+        }
+        return m;
+    }
+
+    public static Distribution getDistribution() {
+        return distribution;
+    }
+
+    public static void setDistribution(Distribution d) {
+        if (d != null) {
+            distribution = d;
+        }
+    }
+
+    public static void resetToDefaults(ParticleSystem particleSystem) {
         timeScale = 1.0f;
         forceFactor = SimulationConfig.FORCE_FACTOR;
         velocityDamping = SimulationConfig.VELOCITY_DAMPING;
         interactionRange = SimulationConfig.INTERACTION_RANGE;
         attractionMatrix = copyMatrix(SimulationConfig.ATTRACTION_MATRIX);
+        particleSystem.repositionAllParticles(distribution);
     }
 
     private static float[][] copyMatrix(float[][] source) {

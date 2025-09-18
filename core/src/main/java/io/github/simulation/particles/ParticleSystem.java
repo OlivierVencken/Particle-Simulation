@@ -4,10 +4,13 @@ import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.*;
 import io.github.simulation.config.SimulationConfig;
 import io.github.simulation.config.RuntimeConfig;
+import io.github.simulation.config.RuntimeConfig.Distribution;
 import io.github.simulation.config.RuntimeGrid;
 
+import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Manages particle data and SSBO operations
@@ -39,10 +42,10 @@ public class ParticleSystem {
         GL30.glBindBufferBase(GL43.GL_SHADER_STORAGE_BUFFER, 0, particleSSBO);
 
         if (count > 0) {
-            FloatBuffer seed = createInitialParticleData(count);
+            FloatBuffer seed = createInitialParticleData(count, SimulationConfig.DISTRIBUTION);
             GL15.glBufferSubData(GL43.GL_SHADER_STORAGE_BUFFER, 0, seed);
         }
-        particleCapacity = count; 
+        particleCapacity = count;
         RuntimeConfig.setParticleCount(count);
     }
 
@@ -72,7 +75,7 @@ public class ParticleSystem {
             growCapacity(Math.max(needed, particleCapacity * 2));
         }
         // Generate new particle data
-        FloatBuffer data = createInitialParticleData(n);
+        FloatBuffer data = createInitialParticleData(n, RuntimeConfig.getDistribution());
         long strideBytes = (long) SimulationConfig.PARTICLE_STRIDE_FLOATS * Float.BYTES;
         long dstOffset = (long) current * strideBytes;
         GL15.glBindBuffer(GL43.GL_SHADER_STORAGE_BUFFER, particleSSBO);
@@ -88,15 +91,15 @@ public class ParticleSystem {
         int newCount = current;
 
         GL15.glBindBuffer(GL43.GL_SHADER_STORAGE_BUFFER, particleSSBO);
-        // READ_WRITE mapping 
-        java.nio.ByteBuffer bb = GL15.glMapBuffer(GL43.GL_SHADER_STORAGE_BUFFER, GL15.GL_READ_WRITE);
+        // READ_WRITE mapping
+        ByteBuffer bb = GL15.glMapBuffer(GL43.GL_SHADER_STORAGE_BUFFER, GL15.GL_READ_WRITE);
         if (bb == null) {
             return; // mapping failed
         }
-        java.nio.FloatBuffer fb = bb.asFloatBuffer();
+        FloatBuffer fb = bb.asFloatBuffer();
         int strideFloats = SimulationConfig.PARTICLE_STRIDE_FLOATS;
 
-        java.util.concurrent.ThreadLocalRandom rng = java.util.concurrent.ThreadLocalRandom.current();
+        ThreadLocalRandom rng = ThreadLocalRandom.current();
 
         for (int k = 0; k < n; k++) {
             if (newCount == 0)
@@ -132,18 +135,18 @@ public class ParticleSystem {
         float[][] palette = RuntimeConfig.getGroupColors();
 
         GL15.glBindBuffer(GL43.GL_SHADER_STORAGE_BUFFER, particleSSBO);
-        java.nio.ByteBuffer bb = GL15.glMapBuffer(GL43.GL_SHADER_STORAGE_BUFFER, GL15.GL_READ_WRITE);
+        ByteBuffer bb = GL15.glMapBuffer(GL43.GL_SHADER_STORAGE_BUFFER, GL15.GL_READ_WRITE);
         if (bb == null) {
             return;
         }
-        java.nio.FloatBuffer fb = bb.asFloatBuffer();
+        FloatBuffer fb = bb.asFloatBuffer();
 
         int stride = SimulationConfig.PARTICLE_STRIDE_FLOATS;
         for (int i = 0; i < current; i++) {
             int base = i * stride;
             int groupId = i % gCount;
 
-            // color offset 
+            // color offset
             int colBase = base + SimulationConfig.OFFSET_COLOR;
             float[] col = palette[groupId];
             fb.put(colBase, col[0]);
@@ -151,7 +154,7 @@ public class ParticleSystem {
             fb.put(colBase + 2, col[2]);
             fb.put(colBase + 3, col[3]);
 
-            // meta/group id offset 
+            // meta/group id offset
             fb.put(base + SimulationConfig.OFFSET_META, (float) groupId);
         }
 
@@ -256,14 +259,15 @@ public class ParticleSystem {
         }
     }
 
-    private FloatBuffer createInitialParticleData(int count) {
+    private FloatBuffer createInitialParticleData(int count, Distribution dist) {
         FloatBuffer initial = BufferUtils.createFloatBuffer(count * SimulationConfig.PARTICLE_STRIDE_FLOATS);
         int groups = SimulationConfig.PARTICLE_GROUPS;
         for (int i = 0; i < count; i++) {
             // Assign a group
             int groupId = i % groups;
 
-            float[] p = sampleCentralPosition();
+            // Position
+            float[] p = samplePosition(dist);
             initial.put(p[0]).put(p[1]).put(0f).put(1f); // pos (w=1)
 
             // Velocity
@@ -280,9 +284,56 @@ public class ParticleSystem {
         return initial;
     }
 
+    public void repositionAllParticles(Distribution dist) {
+        int count = RuntimeConfig.getParticleCount();
+        if (count == 0) {
+            return;
+        }
+        GL15.glBindBuffer(GL43.GL_SHADER_STORAGE_BUFFER, particleSSBO);
+        ByteBuffer bb = GL15.glMapBuffer(GL43.GL_SHADER_STORAGE_BUFFER, GL15.GL_READ_WRITE);
+        if (bb == null) {
+            return;
+        }
+        FloatBuffer fb = bb.asFloatBuffer();
+
+        int stride = SimulationConfig.PARTICLE_STRIDE_FLOATS;
+        for (int i = 0; i < count; i++) {
+            int base = i * stride;
+
+            float[] p = samplePosition(dist);
+
+            // position (OFFSET_POS .. +3)
+            int pBase = base + SimulationConfig.OFFSET_POS;
+            fb.put(pBase, p[0]);
+            fb.put(pBase + 1, p[1]);
+            fb.put(pBase + 2, 0f);
+            fb.put(pBase + 3, 1f);
+
+            // reset velocity (OFFSET_VEL .. +3)
+            int vBase = base + SimulationConfig.OFFSET_VEL;
+            fb.put(vBase, 0f);
+            fb.put(vBase + 1, 0f);
+            fb.put(vBase + 2, 0f);
+            fb.put(vBase + 3, 0f);
+        }
+        GL15.glUnmapBuffer(GL43.GL_SHADER_STORAGE_BUFFER);
+    }
+
+    private static float[] samplePosition(Distribution dist) {
+        switch (dist) {
+            case UNIFORM:
+                return sampleUniformPosition();
+            case CENTER_BIASED:
+                return sampleCentralPosition();
+            case GAUSSIAN:
+                return sampleGaussianPosition();
+            default:
+                return sampleUniformPosition();
+        }
+    }
+
     /**
-     * Uniform distribution in the square [-1, 1] x [-1, 1].
-     * Matches the current behavior.
+     * Uniform distribution in the square [-1, 1] x [-1, 1]
      */
     private static float[] sampleUniformPosition() {
         float x = (float) (Math.random() * 2.0 - 1.0);
@@ -291,18 +342,31 @@ public class ParticleSystem {
     }
 
     /**
-     * Center-biased distribution inside the unit disk.
-     * Uses a radial power law r = U^beta with beta > 0.5 to favor small radii,
-     * and a uniform angle. Increase CENTER_BIAS_BETA for stronger center density.
+     * Center-biased distribution
+     * Uses a radial power law r = U^beta with beta > 0.5
      */
     private static final float CENTER_BIAS_BETA = 1.5f; // > 0.5 biases toward center
 
     private static float[] sampleCentralPosition() {
-        double u = Math.random(); // [0,1)
+        double u = Math.random();
         double theta = Math.random() * Math.PI * 2.0;
-        double r = Math.pow(u, CENTER_BIAS_BETA); // radius in [0,1), biased small
+        double r = Math.pow(u, CENTER_BIAS_BETA);
         float x = (float) (r * Math.cos(theta));
         float y = (float) (r * Math.sin(theta));
         return new float[] { x, y };
+    }
+
+    /**
+     * Gaussian (normal) distribution centered at (0,0)
+     * Uses Box-Muller transform
+     */
+    private static float[] sampleGaussianPosition() {
+        double u1 = Math.max(1e-6, Math.random());
+        double u2 = Math.random();
+        double mag = Math.sqrt(-2.0 * Math.log(u1));
+        double z0 = mag * Math.cos(2 * Math.PI * u2);
+        double z1 = mag * Math.sin(2 * Math.PI * u2);
+        float scale = 0.3f;
+        return new float[] { (float) (z0 * scale), (float) (z1 * scale) };
     }
 }

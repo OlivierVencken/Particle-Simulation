@@ -71,16 +71,30 @@ public class SimulationInputProcessor extends InputAdapter {
                 return true;
 
             // Group count control
-            case Input.Keys.LEFT_BRACKET: // decrease groups
+            case Input.Keys.LEFT_BRACKET: 
                 RuntimeConfig.decreaseGroupCount();
                 return true;
-            case Input.Keys.RIGHT_BRACKET: // increase groups
+            case Input.Keys.RIGHT_BRACKET: 
                 RuntimeConfig.increaseGroupCount();
                 return true;
 
             // Attraction matrix control
             case Input.Keys.SPACE:
                 RuntimeConfig.randomizeAttractionMatrix();
+                return true;
+            
+            // Repositioning controls
+            case Input.Keys.U: 
+                RuntimeConfig.setDistribution(RuntimeConfig.Distribution.UNIFORM);
+                particleSystem.repositionAllParticles(RuntimeConfig.getDistribution());
+                return true;
+            case Input.Keys.B: 
+                RuntimeConfig.setDistribution(RuntimeConfig.Distribution.CENTER_BIASED);
+                particleSystem.repositionAllParticles(RuntimeConfig.getDistribution());
+                return true;
+            case Input.Keys.G: 
+                RuntimeConfig.setDistribution(RuntimeConfig.Distribution.GAUSSIAN);
+                particleSystem.repositionAllParticles(RuntimeConfig.getDistribution());
                 return true;
 
             // Preset controls
@@ -99,7 +113,7 @@ public class SimulationInputProcessor extends InputAdapter {
 
             // Reset 
             case Input.Keys.R:
-                RuntimeConfig.resetToDefaults();
+                RuntimeConfig.resetToDefaults(particleSystem);
                 return true;
 
             // Exit

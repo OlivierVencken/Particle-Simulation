@@ -1,5 +1,6 @@
 package io.github.simulation.config;
 
+import io.github.simulation.config.RuntimeConfig.Distribution;
 import io.github.simulation.util.PaletteUtil;
 /**
  * Configuration constants
@@ -28,6 +29,7 @@ public final class SimulationConfig {
     // { 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f },
     // { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f }
     public static final float[][] ATTRACTION_MATRIX = identity(PARTICLE_GROUPS);
+    public static final Distribution DISTRIBUTION = Distribution.GAUSSIAN;
 
     // Physics constants
     public static final float FORCE_FACTOR = 0.2f; // Global force multiplier
